@@ -1,4 +1,5 @@
-﻿using AnalyticsPipeline.Models;
+﻿using AnalyticsPipeline.Data;
+using AnalyticsPipeline.Models;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
