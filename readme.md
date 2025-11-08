@@ -90,8 +90,8 @@ dotnet restore
 },
 "Jwt": {
   "Key": "this_is_a_super_secret_key_32_chars!",
-  "Issuer": "https://localhost:5144",
-  "Audience": "https://localhost:5144"
+  "Issuer": "https://localhost:7075",
+  "Audience": "https://localhost:7075"
 }
 ```
 
