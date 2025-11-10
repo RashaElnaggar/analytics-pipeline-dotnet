@@ -5,5 +5,12 @@
     "users": 120,
     "sessions": 150,
     "views": 310
+  },
+  {
+    "date": "2025-11-01",
+    "page": "/contact",
+    "users": 50,
+    "sessions": 70,
+    "views": 90
   }
 ]

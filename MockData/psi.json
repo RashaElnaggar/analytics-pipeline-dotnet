@@ -4,5 +4,11 @@
     "page": "/home",
     "performanceScore": 0.9,
     "LCP_ms": 2100
+  },
+  {
+    "date": "2025-11-01",
+    "page": "/contact",
+    "performanceScore": 0.88,
+    "LCP_ms": 2500
   }
 ]

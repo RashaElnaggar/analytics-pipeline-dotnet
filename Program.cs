@@ -81,6 +81,8 @@ builder.Services.AddSwaggerGen(c =>
 
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<DataLoader>();//tell ASP.NET Core how to create a DataLoader
+builder.Services.AddHostedService<RabbitMqConsumerHostedService>();
 
 // --------------------
 // Build app

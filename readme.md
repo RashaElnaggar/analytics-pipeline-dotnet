@@ -1,42 +1,6 @@
-# AnalyticsPipeline - .NET Core Backend
+# AnalyticsPipeline
 
-A small .NET Core backend system that reads mocked Google Analytics (GA) and PageSpeed Insights (PSI) JSON files, publishes data to RabbitMQ, aggregates statistics in SQL Server, and exposes JWT-protected reporting APIs.
-
----
-
-## **Table of Contents**
-
-- [Features](#features)  
-- [Requirements](#requirements)  
-- [Project Structure](#project-structure)  
-- [Setup](#setup)  
-- [Running the Project](#running-the-project)  
-- [Database](#database)  
-- [RabbitMQ](#rabbitmq)  
-- [API Endpoints](#api-endpoints)  
-- [Authentication](#authentication)  
-
----
-
-## **Features**
-
-- Read GA & PSI JSON files and combine into unified records  
-- Publish records to RabbitMQ (real message broker)  
-- Background worker consumes messages and aggregates daily stats  
-- Persist raw and aggregated data to SQL Server  
-- JWT-protected reporting APIs:
-  - `/api/reports/overview` → totals across all pages & dates  
-  - `/api/reports/pages` → totals/averages grouped by page  
-- User registration & login with email/password and JWT  
-
----
-
-## **Requirements**
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)  
-- [SQL Server](https://www.microsoft.com/en-us/sql-server) (Express or full)  
-- [RabbitMQ](https://www.rabbitmq.com/download.html)  
-- [Postman](https://www.postman.com/) or Swagger UI for API testing  
+A small backend system that reads mock JSON data (Google Analytics & PageSpeed Insights), publishes it via RabbitMQ, aggregates it in SQL Server, and exposes reporting APIs secured with JWT.
 
 ---
 
@@ -58,31 +22,43 @@ AnalyticsPipeline/
 │   └─ DailyStats.cs
 │
 ├─ Services/
-│   └─ AuthService.cs
+│   ├─ AuthService.cs
+│   └─ DataLoader.cs
+│
+├─ MockData/
+│   ├─ ga.json
+│   └─ psi.json
 │
 ├─ appsettings.json
 ├─ Program.cs
+├─ Dockerfile
+├─ docker-compose.yml
 └─ README.md
 ```
 
 ---
 
-## **Setup**
+## **1️⃣ Docker Setup**
 
-1. Clone the repository:
+Ensure Docker Desktop is installed and running.
 
+### Build and run all services:
 ```bash
-git clone https://github.com/RashaElnaggar/analytics-pipeline-dotnet.git
-cd analytics-pipeline-dotnet
+docker-compose up --build -d
 ```
 
-2. Install dependencies:
+This will start:
 
+- **API** → `http://localhost:7075/swagger/index.html`  
+- **SQL Server** → `localhost:1433` (user: `sa`, password: `YourStrong!Passw0rd`)  
+- **RabbitMQ** → `http://localhost:15672` (user: `guest`, password: `guest`)  
+
+### Stop services:
 ```bash
-dotnet restore
+docker-compose down
 ```
 
-3. Update `appsettings.json` with your **SQL Server connection** and **JWT settings**:
+---
 
 ```json
 "ConnectionStrings": {
@@ -90,118 +66,107 @@ dotnet restore
 },
 "Jwt": {
   "Key": "this_is_a_super_secret_key_32_chars!",
-  "Issuer": "https://localhost:7075",
-  "Audience": "https://localhost:7075"
+  "Issuer": "https://localhost:5144",
+  "Audience": "https://localhost:5144"
 }
 ```
 
-4. Ensure RabbitMQ is installed and running on your machine.  
+Mock JSON files are in `MockData/`:
+
+- **Google Analytics (ga.json)**
+
+```json
+[
+  { "date": "2025-10-20", "page": "/home", "users": 120, "sessions": 150, "views": 310 }
+]
+```
+
+- **PageSpeed Insights (psi.json)**
+
+```json
+[
+  { "date": "2025-10-20", "page": "/home", "performanceScore": 0.9, "LCP_ms": 2100 }
+]
+```
+
+To seed data into the database:
+
+```http
+POST http://localhost:7075/api/Ingestion/publish
+```
+
+- This reads JSON → publishes to RabbitMQ → background consumer → inserts into SQL Server → updates aggregated `DailyStats`.
 
 ---
 
-## **Running the Project**
+## **3️⃣ Swagger & JWT Testing**
+
+1. Open Swagger UI:
+
+```
+http://localhost:7075/swagger/index.html
+```
+
+2. **Signup/Login** via `/api/Auth/signup` and `/api/Auth/login`:
+
+- `POST /api/Auth/signup` with JSON body:
+
+```json
+{
+  "name": "Rasha",
+  "email": "rasha@example.com",
+  "password": "Test123!"
+}
+```
+
+- `POST /api/Auth/login` with JSON body:
+
+```json
+{
+  "email": "rasha@example.com",
+  "password": "Test123!"
+}
+```
+
+- Copy the returned **JWT token**.
+
+3. **Authorize requests**:
+
+- In Swagger, click **Authorize** → paste `Bearer <your-token>` → execute `/reports/overview` or `/reports/pages`.
+
+---
+
+## **4️⃣ Reports API**
+
+- **GET /api/Reports/overview** → aggregated totals across all pages & dates.
+- **GET /api/Reports/pages** → aggregated totals per page.
+
+Both endpoints require **JWT Bearer token**.
+
+---
+
+## **5️⃣ Database**
+
+- **Users**: Id, Name, Email, PasswordHash, CreatedAt  
+- **RawData**: Id, Page, Date, Users, Sessions, Views, PerformanceScore, LCPms, ReceivedAt  
+- **DailyStats**: Id, Date, TotalUsers, TotalSessions, TotalViews, AvgPerformance, LastUpdatedAt
+
+---
+
+## **6️⃣ Notes**
+
+- Docker maps host port 7075 → container port 80. Endpoints remain unchanged.  
+- RabbitMQ UI: `http://localhost:15672` (guest/guest)  
+- SQL Server can be accessed with your favorite client (SSMS, Azure Data Studio) using `localhost,1433`.
+
+---
+
+## **7️⃣ Troubleshooting**
+
+- If API returns **404 on reports**, make sure you’ve ingested JSON data first (`/api/Ingestion/publish`).  
+- If 401 Unauthorized → ensure you are passing **JWT Bearer token** in Authorization header.  
+- Logs can be checked in Docker Desktop or via:
 
 ```bash
-dotnet run
+docker-compose logs -f
 ```
-
-- The app will run at:  
-```
-http://localhost:5144
-```
-
-- Swagger UI (API documentation & testing) is available at:  
-```
-http://localhost:5144/swagger/index.html
-```
-
----
-
-## **Database**
-
-- The project uses **EF Core** with SQL Server  
-- Automatically runs migrations on startup (dev environment)  
-- Tables created:
-  - `Users` → stores registered users  
-  - `RawData` → stores ingested GA & PSI data  
-  
-  - `DailyStats` → stores aggregated daily stats  
-
----
-
-## **RabbitMQ**
-
-- Exchanges & queues:
-  - `analytics.raw` → main exchange for raw records  
-  - `analytics.raw.q` → queue bound to the exchange  
-- Background worker consumes messages from the queue and aggregates data  
-
----
-
-## **API Endpoints**
-
-### **Auth (JWT)**
-
-| Method | Endpoint             | Description                       |
-|--------|--------------------|-----------------------------------|
-| POST   | /api/auth/register  | Register a new user               |
-| POST   | /api/auth/login     | Login and receive JWT token       |
-
-**Example Login Request Body:**
-
-```json
-{
-  "email": "test@example.com",
-  "passwordHash": "123456"
-}
-```
-
-**Example Response:**
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
----
-
-### **Reports (JWT Protected)**
-
-> Add `Authorization: Bearer <your-token>` in headers  
-
-| Method | Endpoint                     | Description                               |
-|--------|------------------------------|-------------------------------------------|
-| GET    | /api/reports/overview        | Total users, sessions, views, avg performance |
-| GET    | /api/reports/pages           | Totals/averages grouped by page           |
-
----
-
-## **Authentication**
-
-- Use JWT Bearer tokens to access reports  
-- Steps:
-  1. Register a user via `/api/auth/register`  
-  2. Login via `/api/auth/login` to get JWT token  
-  3. Use the token in the **Authorization header** for report endpoints  
-
-**Header Example:**
-
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
----
-
-## **Testing**
-
-- Use **Swagger UI**: `http://localhost:5144/swagger/index.html`  
-- Use **Postman** to call endpoints with JWT  
-- Ensure RabbitMQ and SQL Server are running before testing  
-
----
-
-## **License**
-
-MIT License – feel free to modify and use.
-

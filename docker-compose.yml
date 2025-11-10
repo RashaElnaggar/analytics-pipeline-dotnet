@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: analytics-sql
+    environment:
+      SA_PASSWORD: "YourStrong!Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: analytics-rabbitmq
+    ports:
+      - "15672:15672"   # RabbitMQ broker port
+      - "7075:7075" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  api:
+    build: .
+    container_name: analytics-api
+    depends_on:
+      - sqlserver
+      - rabbitmq
+    ports:
+      - "7075:80"
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=AnalyticsDB;User Id=sa;Password=123;"
+      RabbitMQ__Host: "rabbitmq"
+      RabbitMQ__User: "guest"
+      RabbitMQ__Pass: "guest"
+      Jwt__Key: "YourVeryStrongSecretKey123!"
+      Jwt__Issuer: "AnalyticsAPI"
+      Jwt__Audience: "AnalyticsClient"
+
+volumes:
+  sql_data:
